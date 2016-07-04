@@ -1,0 +1,314 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<HEAD>
+  <TITLE> jsTetris </TITLE>
+  <META name="Generator" content="EditPlus">
+  <META name="Author" content="meisl">
+
+    <SCRIPT type="text/javascript">
+    <!--
+        function bmTranspose(bitmap) {
+            var result = [],
+                h = bitmap.length,
+                w = bitmap[0].length,
+                newH = w,
+                newW = h;
+            for (var y = 0; y < newH; y++) {
+                var row = [];
+                for (var x = 0; x < newW; x++) {
+                    row[x] = bitmap[x][y];
+                }
+                result[y] = row;
+            }
+
+            return result;
+        }
+        
+        function bmRotate(bitmap) {
+            var result = [],
+                h = bitmap.length,
+                w = bitmap[0].length,
+                newH = w,
+                newW = h;
+            for (var y = 0; y < newH; y++) {
+                var row = [];
+                for (var x = 0; x < newW; x++) {
+                    row[x] = bitmap[h - x - 1][y];
+                }
+                result[y] = row;
+            }
+
+            return result;
+        }
+        
+        function bmMirror(bitmap) {
+            return bmRotate(bmTranspose(bitmap));
+        }
+
+        function bmEquals(bmA, bmB) {
+            var x, y,
+                rowA, rowB
+            if (bmA.length !== bmB.length) {
+                return false;
+            }
+            for (y = 0; y < bmA.length; y++) {
+                rowA = bmA[y];
+                rowB = bmB[y];
+                if (rowA.length !== rowB.length) {
+                    return false;
+                }
+                for (x = 0; x < rowA.length; x++) {
+                    if (rowA[x] !== rowB[x]) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function Piece(color, bitmap) {
+            this.color = color;
+            Piece[Piece.len++] = this;
+            var i = 0,
+                bm = bitmap;
+            do {
+                this[i] = {
+                    color: color,
+                    rows: bm,
+                    rotA: null,
+                    rotB: null,
+                };
+                bm = bmRotate(bm);
+                if (i > 0) {
+                    this[i].rotA = this[i - 1];
+                    this[i - 1].rotC = this[i];
+                }
+                i++;
+            } while (!bmEquals(bm, bitmap));
+            this[0].rotA = this[i - 1];
+            this[i - 1].rotC = this[0];
+            this.length = i;
+        }
+
+        Piece.prototype = {
+        };
+        Piece.len = 0;
+        Piece.J = new Piece("blue", [
+            [0, 1],
+            [0, 1],
+            [1, 1]
+        ]);
+        Piece.L = new Piece("orange", bmMirror(Piece.J[0].rows));
+        Piece.Z = new Piece("red", [
+            [1, 1, 0],
+            [0, 1, 1]
+        ]);
+        Piece.S = new Piece("green", bmMirror(Piece.Z[0].rows));
+        Piece.T = new Piece("purple", [
+            [1, 1, 1],
+            [0, 1, 0]
+        ]);
+        Piece.O = new Piece("yellow", [
+            [1, 1],
+            [1, 1]
+        ]);
+        Piece.I = new Piece("cyan", [
+            [1, 1, 1, 1]
+        ]);
+
+        function Field(w, h) {
+            var cW = 20,
+                cH = 20,
+                bW = 1,
+                fDiv = document.createElement("div"),
+                cells = [];
+            this.w = w;
+            this.h = h;
+            this.emptyColor   = "#222222";
+            this.cells        = cells;
+            this.div          = fDiv;
+            this.currentPiece = null;
+            this.currentX     = null;
+            this.currentY     = null;
+            for (var y = 0; y < h; y++) {
+                row = [];
+                for (var x = 0; x < w; x++) {
+                    var cDiv = document.createElement("div");
+                    cDiv.style.width  = cW + "px";
+                    cDiv.style.height = cH + "px";
+                    cDiv.style.backgroundColor = this.emptyColor;
+                    cDiv.style.top  = (bW + y * (cH + bW)) + "px";
+                    cDiv.style.left = (bW + x * (cW + bW)) + "px";
+                    cDiv.style.position = "absolute";
+                    row[x] = {
+                        div: cDiv,
+                        x: x,
+                        y: y,
+                        piece: null
+                    };
+                    fDiv.appendChild(cDiv);
+                }
+                cells[h - 1 - y] = row;
+            }
+            fDiv.style.width  = (bW + w * (cW + bW)) + "px";
+            fDiv.style.height = (bW + h * (cH + bW)) + "px";
+            fDiv.style.position = "absolute";
+            fDiv.style.backgroundColor = "#333333"; //TODO: a bit darker than this.emptyColor
+
+            var self = this,
+                onload = window.onload;
+            window.onload = function () {
+                self.show();
+                if (onload) {
+                    onload();
+                }
+            };
+        }
+        Field.prototype = {
+            show: function (x, y) {
+                this.x = x || this.x || 100;
+                this.y = y || this.y ||  20;
+                this.div.style.left = this.x + "px";
+                this.div.style.top  = this.y + "px";
+                document.body.appendChild(this.div);
+            },
+            set: function (x, y, piece) {
+                if (!(x >= 0 && x < this.w && y >= 0 && y < this.h)) {
+                    throw new Error("set(): illegal coordinates (" + x + ", " + y + ")");
+                }
+                var row  = this.cells[y],
+                    cell = row[x];
+                cell.piece = piece;
+                cell.div.style.backgroundColor = (piece === null) ? this.emptyColor : piece.color;
+            },
+            clear: function (x, y) {
+                this.set(x, y, null);
+            },
+            forEachCell: function (f) {
+                for (var y = 0; y < this.h; y++) {
+                    for (var x = 0; x < this.w; x++) {
+                        f(this.cells[y][x]);
+                    }
+                }
+            },
+            isFree: function (x, y) {
+                return this.cells[y][x].piece === null;
+            },
+            setPiece: function (piece, x, y, color) {
+                var pW = piece.rows.length;
+                for (var pY = 0; pY < pW; pY++) {
+                    var row = piece.rows[pW - 1 - pY];
+                    for (var pX = 0; pX < row.length; pX++) {
+                        if (row[pX]) {
+                            this.set(x + pX, y + pY, color);
+                        }
+                    }
+                }
+            },
+            put: function (piece, x, y) {
+                this.setPiece(piece, x, y, piece);
+            },
+            remove: function (piece, x, y) {
+                this.setPiece(piece, x, y, null);
+            },
+            inject: function (piece) {
+                var x = Math.floor((this.w - piece.rows[0].length) / 2),
+                    y = this.h - 5;
+                this.put(piece, x, y);
+                this.currentPiece = piece;
+                this.currentX = x;
+                this.currentY = y;
+            },
+            moveCurrent: function (dx, dy) {
+                this.remove(this.currentPiece, this.currentX, this.currentY);
+                this.currentX += dx;
+                this.currentY += dy;
+                this.put(this.currentPiece, this.currentX, this.currentY);
+            },
+            rotateCurrent: function (d) {
+                this.remove(this.currentPiece, this.currentX, this.currentY);
+                if (d > 0) {
+                    this.currentPiece = this.currentPiece.rotA;
+                } else {
+                     this.currentPiece = this.currentPiece.rotC;
+                }
+                this.put(this.currentPiece, this.currentX, this.currentY);
+            }
+        };
+
+
+        var w = 10,
+            h = 20;
+        var mainField = new Field(w, h);
+
+        for (var i = 0; i < mainField.h; i++) {
+            //mainField.set(6, i, Piece[i % Piece.len]);
+        }
+
+        //mainField.clear(0, mainField.h - 1);
+        //mainField.clear(0, mainField.h - 2);
+        /*
+        mainField.forEachCell(function (c) {
+            if (mainField.isFree(c.x, c.y)) {
+                c.div.innerHTML = "-";
+            } else {
+                c.div.innerHTML = c.piece.color;
+            }
+            //mainField.clear(c.x, c.y);
+        });
+        */
+
+        var pcField = new Field(20, Piece.len * 5);
+        pcField.x = 450;
+        for (var i = 0; i < Piece.len; i++) {
+            var p = Piece[i];
+            for (var k = 0; k < p.length; k++) {
+                pcField.put(p[k], k * 5, i * 5);
+            }
+        }
+
+
+        keys = {
+            88:    function () { mainField.rotateCurrent(+1); return "ROT-A"; },   // x
+            86:    function () { mainField.rotateCurrent(-1); return "ROT-C"; },   // v
+            32:    function () { return "DROP"; },   // SPACE
+            37:    function () { mainField.moveCurrent(-1,  0); return "LEFT";  },   // LEFT
+            38:    function () { mainField.moveCurrent( 0, +1); return "UP";    },   // UP
+            39:    function () { mainField.moveCurrent(+1,  0); return "RIGHT"; },   // RIGHT
+            40:    function () { mainField.moveCurrent( 0, -1); return "DOWN";  },   // DOWN
+
+            90:    function () { mainField.inject(Piece.Z[0]); return "Z"; },   // Z
+            83:    function () { mainField.inject(Piece.S[0]); return "S"; },   // S
+            84:    function () { mainField.inject(Piece.T[0]); return "T"; },   // T
+            73:    function () { mainField.inject(Piece.I[0]); return "I"; },   // I
+            74:    function () { mainField.inject(Piece.J[0]); return "J"; },   // J
+            76:    function () { mainField.inject(Piece.L[0]); return "L"; },   // L
+            79:    function () { mainField.inject(Piece.O[0]); return "O"; },   // O
+
+            80:    function () { return "P"; },         // P
+            19:    function () { return "PAUSE"; },     // PAUSE
+            27:    function () { return "ESC"; },       // ESC
+        };
+
+        document.onkeydown = function (evt) {
+            var evt = evt || window.event,
+                nChr = evt.charCode || evt.keyCode,
+                what = "";
+                if (keys[nChr]) {
+                    what = keys[nChr]();
+                }
+                document.body.appendChild(document.createTextNode(nChr + ": " + what));
+                document.body.appendChild(document.createElement("br"));
+                return false;
+        }
+
+        mainField.inject(Piece.T[0]);
+
+
+    //-->
+    </SCRIPT>
+</HEAD>
+
+ <BODY>
+ </BODY>
+</HTML>
