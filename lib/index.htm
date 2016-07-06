@@ -334,6 +334,16 @@
                                 
                             } else {
                                 // TODO: check for completed rows
+                                var maxY = self.currentY + self.currentPiece.rows.length;
+                                for (var y = self.currentY; y < maxY; ) {
+                                    console.log("check " + y + ": maxY = " + maxY);
+                                    if (self.isRowComplete(y)) {
+                                        self.deleteRow(y);
+                                        maxY--;
+                                    } else {
+                                        y++;
+                                    }
+                                }
                                 gameOver = !self.injectRandom();
                             }
                         } else { // no currentPiece
@@ -351,29 +361,28 @@
                     this.ticking = null;
                 }
             },
+            isRowComplete: function (y) {
+                console.log("isRowComplete(" + y + ")");
+                for (var x = 0; x < this.w; x++) {
+                    if (this.isFree(x, y)) {
+                        return false;
+                    }
+                }
+                return true;
+            },
+            deleteRow: function (y) {
+                for (var i = y + 1; i < this.h; i++) {
+                    for (var x = 0; x < this.w; x++) {
+                        this.set(x, i - 1, this.cells[i][x].piece);
+                    }
+                }
+            },
         };
 
 
         var w = 10,
             h = 20;
         var mainField = new Field(w, h);
-
-        for (var i = 0; i < mainField.h; i++) {
-            //mainField.set(6, i, Piece[i % Piece.len]);
-        }
-
-        //mainField.clear(0, mainField.h - 1);
-        //mainField.clear(0, mainField.h - 2);
-        /*
-        mainField.forEachCell(function (c) {
-            if (mainField.isFree(c.x, c.y)) {
-                c.div.innerHTML = "-";
-            } else {
-                c.div.innerHTML = c.piece.color;
-            }
-            //mainField.clear(c.x, c.y);
-        });
-        */
 
         var pcField = new Field(20, Piece.len * 5);
         pcField.x = 450;
@@ -386,25 +395,32 @@
 
 
         keys = {
-            88:    function () { mainField.rotateCurrent(+1); return "ROT-A"; },   // x
-            86:    function () { mainField.rotateCurrent(-1); return "ROT-C"; },   // v
-            32:    function () { mainField.dropCurrent(); return "DROP"; },   // SPACE
-            37:    function () { mainField.moveCurrent(-1,  0); return "LEFT";  },   // LEFT
-            38:    function () { mainField.moveCurrent( 0, +1); return "UP";    },   // UP
-            39:    function () { mainField.moveCurrent(+1,  0); return "RIGHT"; },   // RIGHT
-            40:    function () { mainField.moveCurrent( 0, -1); return "DOWN";  },   // DOWN
-
-            90:    function () { mainField.inject(Piece.Z[0]); return "Z"; },   // Z
-            83:    function () { mainField.inject(Piece.S[0]); return "S"; },   // S
-            84:    function () { mainField.inject(Piece.T[0]); return "T"; },   // T
-            73:    function () { mainField.inject(Piece.I[0]); return "I"; },   // I
-            74:    function () { mainField.inject(Piece.J[0]); return "J"; },   // J
-            76:    function () { mainField.inject(Piece.L[0]); return "L"; },   // L
-            79:    function () { mainField.inject(Piece.O[0]); return "O"; },   // O
-
-            80:    function () { return "P"; },         // P
-            19:    function () { return "PAUSE"; },     // PAUSE
-            27:    function () {        // ESC
+             86:   function () { mainField.rotateCurrent(-1); return "ROT-C"; },   // v
+             87:   function () { return "W"; },   // w
+             65:   function () { return "A"; },   // a
+             68:   function () { return "D"; },   // d
+            104:   function () { mainField.moveCurrent( 0, +1); return "Num-8(UP)";     },   // NUM-8
+             98:   function () { mainField.moveCurrent( 0, -1); return "Num-2(DOWN)";   },   // NUM-2
+            100:   function () { mainField.moveCurrent(-1,  0); return "Num-4(LEFT)";   },   // NUM-4
+            102:   function () { mainField.moveCurrent(+1,  0); return "Num-6(RIGHT)";  },   // NUM-6
+             88:   function () {    return "ROT-A"; },  // x
+             32:   function () { mainField.dropCurrent();       return "DROP"; },           // SPACE
+             38:   function () { mainField.rotateCurrent(+1);   return "UP(ROT-A)";    },   // UP
+             40:   function () { mainField.rotateCurrent(-1);   return "DOWN(ROT-C)";  },   // DOWN
+             37:   function () { mainField.moveCurrent(-1,  0); return "LEFT";  },          // LEFT
+             39:   function () { mainField.moveCurrent(+1,  0); return "RIGHT"; },          // RIGHT
+             
+             90:   function () { mainField.inject(Piece.Z[0]); return "Z"; },   // Z
+             83:   function () { mainField.inject(Piece.S[0]); return "S"; },   // S
+             84:   function () { mainField.inject(Piece.T[0]); return "T"; },   // T
+             73:   function () { mainField.inject(Piece.I[0]); return "I"; },   // I
+             74:   function () { mainField.inject(Piece.J[0]); return "J"; },   // J
+             76:   function () { mainField.inject(Piece.L[0]); return "L"; },   // L
+             79:   function () { mainField.inject(Piece.O[0]); return "O"; },   // O
+             
+             80:   function () { return "P"; },         // P
+             19:   function () { return "PAUSE"; },     // PAUSE
+             27:   function () {        // ESC
                         mainField.stopDropping();
                         mainField.stopTicking();
                         mainField.clear();
