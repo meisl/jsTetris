@@ -280,31 +280,48 @@
                 return this.inject(piece);
             },
             dropCurrent: function () {
+                if (this.dropping) {
+                    return;
+                }
                 var delay = 5,
                     self = this,
                     down = function () {
                         return self.moveCurrent(0, -1);
                     },
-                    onTick = function () {
+                    onDrop = function () {
                         if (self.currentPiece) {
                             if (!down()) {
-                                // TODO: check for completed rows
-                                window.setTimeout(function () {
+                                if (self.dropping) {
+                                    self.dropping = null;
+                                    window.setTimeout(function () {
+                                        self.startTicking();
+                                    }, 750);
+                                } else {
                                     self.startTicking();
-                                }, 750);
+                                }
 
                             } else {
-                                window.setTimeout(onTick, delay);
+                                self.dropping = window.setTimeout(onDrop, delay);
                             }
                         } else {
+                            self.dropping = null;
                             self.startTicking();
                         }
                     };
                 self.stopTicking();
                 // disable keys
-                onTick();
+                onDrop();
+            },
+            stopDropping: function () {
+                if (this.dropping) {
+                    window.clearTimeout(this.dropping);
+                    this.dropping = null;
+                }
             },
             startTicking: function () {
+                if (this.ticking) {
+                    return;
+                }
                 var delay = 750,
                     gameOver = false,
                     self = this,
@@ -323,15 +340,15 @@
                             gameOver = !self.injectRandom();
                         }
                         if (!gameOver) {
-                            self.ticker = window.setTimeout(onTick, delay);
+                            self.ticking = window.setTimeout(onTick, delay);
                         }
                     };
                 onTick();
             },
             stopTicking: function () {
-                if (this.ticker) {
-                    window.clearTimeout(this.ticker);
-                    this.ticker = null;
+                if (this.ticking) {
+                    window.clearTimeout(this.ticking);
+                    this.ticking = null;
                 }
             },
         };
@@ -388,6 +405,7 @@
             80:    function () { return "P"; },         // P
             19:    function () { return "PAUSE"; },     // PAUSE
             27:    function () {        // ESC
+                        mainField.stopDropping();
                         mainField.stopTicking();
                         mainField.clear();
                         mainField.currentPiece = null;
