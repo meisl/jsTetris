@@ -263,7 +263,26 @@
                     this.put(this.currentPiece, this.currentX, this.currentY);
                     return false;
                 }
-            }
+            },
+            dropCurrent: function () {
+                var self = this,
+                    drop = function () {
+                        return self.moveCurrent(0, -1);
+                    },
+                    continueDropping = function () {
+                        window.setTimeout(function () {
+                            if (!drop()) {
+                                // enable keys
+                            } else {
+                                continueDropping();
+                            }
+                        }, 5);
+                    }
+                if (drop()) {
+                    // disable keys
+                    continueDropping();
+                }
+            },
         };
 
 
@@ -301,7 +320,7 @@
         keys = {
             88:    function () { mainField.rotateCurrent(+1); return "ROT-A"; },   // x
             86:    function () { mainField.rotateCurrent(-1); return "ROT-C"; },   // v
-            32:    function () { return "DROP"; },   // SPACE
+            32:    function () { mainField.dropCurrent(); return "DROP"; },   // SPACE
             37:    function () { mainField.moveCurrent(-1,  0); return "LEFT";  },   // LEFT
             38:    function () { mainField.moveCurrent( 0, +1); return "UP";    },   // UP
             39:    function () { mainField.moveCurrent(+1,  0); return "RIGHT"; },   // RIGHT
