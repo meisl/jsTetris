@@ -264,6 +264,11 @@
                     return false;
                 }
             },
+            insertRandom: function () { 
+                var kind  = Piece[Math.floor(Math.random() * Piece.len)],
+                    piece = kind[Math.floor(Math.random() * kind.length)];
+                this.inject(piece);
+            },
             dropCurrent: function () {
                 var self = this,
                     drop = function () {
@@ -282,6 +287,22 @@
                     // disable keys
                     continueDropping();
                 }
+            },
+            startTicking: function () {
+                var delay = 750,
+                    self = this,
+                    down = function () {
+                        return self.moveCurrent(0, -1);
+                    },
+                    onTick = function () {
+                        console.log("tick: " + self.currentPiece);
+                        if (!self.currentPiece || !down()) {
+                            // TODO: check for completed rows
+                            self.insertRandom();
+                        }
+                        window.setTimeout(onTick, delay);
+                    };
+                onTick();
             },
         };
 
@@ -351,7 +372,7 @@
                 return false;
         }
 
-        mainField.inject(Piece.T[0]);
+        mainField.startTicking();
 
 
     //-->
