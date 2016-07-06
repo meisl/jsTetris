@@ -172,10 +172,20 @@
                 this.div.style.top  = this.y + "px";
                 document.body.appendChild(this.div);
             },
-            set: function (x, y, piece) {
-                if (!(x >= 0 && x < this.w && y >= 0 && y < this.h)) {
+            isValid: function (x, y) {
+                return x >= 0 && x < this.w && y >= 0 && y < this.h;
+            },
+            assertValid: function (x, y) {
+                if (!this.isValid(x, y)) {
                     throw new Error("set(): illegal coordinates (" + x + ", " + y + ")");
                 }
+            },
+            isFree: function (x, y) {
+                this.assertValid(x, y);
+                return this.cells[y][x].piece === null;
+            },
+            set: function (x, y, piece) {
+                this.assertValid(x, y);
                 var row  = this.cells[y],
                     cell = row[x];
                 cell.piece = piece;
@@ -191,29 +201,42 @@
                     }
                 }
             },
-            isFree: function (x, y) {
-                return this.cells[y][x].piece === null;
-            },
-            setPiece: function (piece, x, y, color) {
+            tryPiece: function (piece, x, y, f) {
                 var pW = piece.rows.length;
                 for (var pY = 0; pY < pW; pY++) {
                     var row = piece.rows[pW - 1 - pY];
                     for (var pX = 0; pX < row.length; pX++) {
-                        if (row[pX]) {
-                            this.set(x + pX, y + pY, color);
-                        }
+                        f.call(this, x + pX, y + pY, row[pX], pX, pY);
                     }
                 }
             },
+            setPiece: function (piece, x, y, color) {
+                this.tryPiece(piece, x, y, function (tX, tY, p, pX, pY) {
+                    if (p) {
+                        this.set(tX, tY, color);
+                    }
+                });
+            },
             put: function (piece, x, y) {
-                this.setPiece(piece, x, y, piece);
+                var result = true;
+                this.tryPiece(piece, x, y, function (tX, tY, p, pX, pY) {
+                    if (p) {
+                        if (!this.isValid(tX, tY) || !this.isFree(tX, tY)) {
+                            result = false;
+                        }
+                    }
+                });
+                if (result) {
+                    this.setPiece(piece, x, y, piece);
+                }
+                return result;
             },
             remove: function (piece, x, y) {
                 this.setPiece(piece, x, y, null);
             },
             inject: function (piece) {
                 var x = Math.floor((this.w - piece.rows[0].length) / 2),
-                    y = this.h - 5;
+                    y = this.h - 4;
                 this.put(piece, x, y);
                 this.currentPiece = piece;
                 this.currentX = x;
@@ -221,18 +244,25 @@
             },
             moveCurrent: function (dx, dy) {
                 this.remove(this.currentPiece, this.currentX, this.currentY);
-                this.currentX += dx;
-                this.currentY += dy;
-                this.put(this.currentPiece, this.currentX, this.currentY);
+                if (this.put(this.currentPiece, this.currentX + dx, this.currentY + dy)) {
+                    this.currentX += dx;
+                    this.currentY += dy;
+                    return true;
+                } else {
+                    this.put(this.currentPiece, this.currentX, this.currentY);
+                    return false;
+                }
             },
             rotateCurrent: function (d) {
+                var rotated = (d > 0) ? this.currentPiece.rotA : this.currentPiece.rotC;
                 this.remove(this.currentPiece, this.currentX, this.currentY);
-                if (d > 0) {
-                    this.currentPiece = this.currentPiece.rotA;
+                if (this.put(rotated, this.currentX, this.currentY)) {
+                    this.currentPiece = rotated;
+                    return true;
                 } else {
-                     this.currentPiece = this.currentPiece.rotC;
+                    this.put(this.currentPiece, this.currentX, this.currentY);
+                    return false;
                 }
-                this.put(this.currentPiece, this.currentX, this.currentY);
             }
         };
 
