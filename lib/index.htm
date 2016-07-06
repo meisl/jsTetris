@@ -191,13 +191,16 @@
                 cell.piece = piece;
                 cell.div.style.backgroundColor = (piece === null) ? this.emptyColor : piece.color;
             },
-            clear: function (x, y) {
-                this.set(x, y, null);
+            clear: function () {
+                var self = this;
+                self.forEachCell(function (c, x, y) {
+                    self.set(x, y, null);
+                });
             },
             forEachCell: function (f) {
                 for (var y = 0; y < this.h; y++) {
                     for (var x = 0; x < this.w; x++) {
-                        f(this.cells[y][x]);
+                        f(this.cells[y][x], x, y);
                     }
                 }
             },
@@ -237,10 +240,13 @@
             inject: function (piece) {
                 var x = Math.floor((this.w - piece.rows[0].length) / 2),
                     y = this.h - 4;
-                this.put(piece, x, y);
-                this.currentPiece = piece;
-                this.currentX = x;
-                this.currentY = y;
+                if (this.put(piece, x, y)) {
+                    this.currentPiece = piece;
+                    this.currentX = x;
+                    this.currentY = y;
+                    return true;
+                }
+                return false;
             },
             moveCurrent: function (dx, dy) {
                 this.remove(this.currentPiece, this.currentX, this.currentY);
@@ -264,45 +270,69 @@
                     return false;
                 }
             },
-            insertRandom: function () { 
+            randomPiece: function () {
                 var kind  = Piece[Math.floor(Math.random() * Piece.len)],
                     piece = kind[Math.floor(Math.random() * kind.length)];
-                this.inject(piece);
+                return piece;
+            },
+            injectRandom: function () {
+                var piece = this.randomPiece();
+                return this.inject(piece);
             },
             dropCurrent: function () {
-                var self = this,
-                    drop = function () {
-                        return self.moveCurrent(0, -1);
-                    },
-                    continueDropping = function () {
-                        window.setTimeout(function () {
-                            if (!drop()) {
-                                // enable keys
-                            } else {
-                                continueDropping();
-                            }
-                        }, 5);
-                    }
-                if (drop()) {
-                    // disable keys
-                    continueDropping();
-                }
-            },
-            startTicking: function () {
-                var delay = 750,
+                var delay = 5,
                     self = this,
                     down = function () {
                         return self.moveCurrent(0, -1);
                     },
                     onTick = function () {
-                        console.log("tick: " + self.currentPiece);
-                        if (!self.currentPiece || !down()) {
-                            // TODO: check for completed rows
-                            self.insertRandom();
+                        if (self.currentPiece) {
+                            if (!down()) {
+                                // TODO: check for completed rows
+                                window.setTimeout(function () {
+                                    self.startTicking();
+                                }, 750);
+
+                            } else {
+                                window.setTimeout(onTick, delay);
+                            }
+                        } else {
+                            self.startTicking();
                         }
-                        window.setTimeout(onTick, delay);
+                    };
+                self.stopTicking();
+                // disable keys
+                onTick();
+            },
+            startTicking: function () {
+                var delay = 750,
+                    gameOver = false,
+                    self = this,
+                    down = function () {
+                        return self.moveCurrent(0, -1);
+                    },
+                    onTick = function () {
+                        if (self.currentPiece) {
+                            if (down()) {
+                                
+                            } else {
+                                // TODO: check for completed rows
+                                gameOver = !self.injectRandom();
+                            }
+                        } else { // no currentPiece
+                            gameOver = !self.injectRandom();
+                        }
+                        if (!gameOver) {
+                            self.ticker = window.setTimeout(onTick, delay);
+                        }
                     };
                 onTick();
+            },
+            stopTicking: function () {
+                if (this.ticker) {
+                    window.clearTimeout(this.ticker);
+                    this.ticker = null;
+                }
             },
         };
 
@@ -357,7 +387,13 @@
 
             80:    function () { return "P"; },         // P
             19:    function () { return "PAUSE"; },     // PAUSE
-            27:    function () { return "ESC"; },       // ESC
+            27:    function () {        // ESC
+                        mainField.stopTicking();
+                        mainField.clear();
+                        mainField.currentPiece = null;
+                        mainField.startTicking();
+                        return "ESC"; 
+                    },
         };
 
         document.onkeydown = function (evt) {
