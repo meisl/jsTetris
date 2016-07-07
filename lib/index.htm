@@ -284,6 +284,50 @@
                     this.startTicking(); // reinstall next tick (will occur sooner)
                 }
             },
+            clearRow: function (y) {
+                this.assertValid(0, y);
+                for (var x = 0; x < this.w; x++) {
+                    this.set(x, y, null);
+                }
+            },
+            burnRows: function (ys, then) {
+                var self = this;
+                self.flashRows(ys, function () {
+                    for (var i = 0; i < ys.length; i++) {
+                        self.clearRow(ys[i]);
+                    }
+                    then();
+                });
+            },
+            checkCompleted: function () {
+                var y    = this.currentY,
+                    maxY = y + this.currentPiece.rows.length;
+                while (y < maxY) {
+                    if (this.isRowComplete(y)) {
+                        this.completed.push(y);
+                    }
+                    y++;
+                }
+                return this.completed.length > 0;
+            },
+            dropFirstCompleted: function () {
+                var x, y, i;
+                if (this.completed.length) {
+                    for (y = this.completed.shift(); y < this.h - 1; y++) {
+                        for (x = 0; x < this.w; x++) {
+                            this.set(x, y, this.cells[y + 1][x].piece);
+                        }
+                    }
+                    // "shift in" an empty row at the top
+                    this.clearRow(this.h - 1);
+                    // update remaining completed rows
+                    for (i = 0; i < this.completed.length; i++) {
+                        this.completed[i]--;
+                    }
+                    return true;
+                }
+                return false;
+            },
             startTicking: function () {
                 if (this.ticking) {
                     return;
@@ -296,21 +340,7 @@
                     onTick = function () {
                         var x, y, maxY, i;
                         log("tick({ currentPiece: " + (self.currentPiece ? self.currentX + "/" + self.currentY : "-") + ", dropping: " + self.dropping + ", completed: [" + self.completed.join(", ") + "] })");
-                        if (self.completed.length) {
-                            y = self.completed.shift();
-                            while (y < self.h - 1) {
-                                for (x = 0; x < self.w; x++) {
-                                    self.set(x, y, self.cells[y + 1][x].piece);
-                                }
-                                y++;
-                            }
-                            // "shift in" an empty row at the top
-                            for (x = 0; x < self.w; x++) {
-                                self.set(x, self.h - 1, null);
-                            }
-                            for (i = 0; i < self.completed.length; i++) {
-                                self.completed[i]--;
-                            }
+                        if (self.dropFirstCompleted()) {
                             if (!self.currentPiece) {
                                 self.inject(Piece.I[1]);    //Random();
                             } else {
@@ -323,17 +353,9 @@
                                 if (self.dropping) {
                                     self.dropping = false;
                                 } else {
-                                    y = self.currentY,
-                                    maxY = y + self.currentPiece.rows.length;
-                                    while (y < maxY) {
-                                        if (self.isRowComplete(y)) {
-                                            self.completed.push(y);
-                                        }
-                                        y++;
-                                    }
-                                    self.currentPiece = null;
-                                    if (self.completed.length) {
-                                        self.flashRows(self.completed, onTick);
+                                    if (self.checkCompleted()) {
+                                        self.currentPiece = null;
+                                        self.burnRows(self.completed, onTick);
                                         return;
                                     } else {
                                         gameOver = !self.injectRandom();
@@ -368,19 +390,15 @@
             flashRows: function (ys, then) {
                 log("flashRows([" + ys.join(", ") + "])");
                 var self  = this,
-                    delay = 20,
-                    k     = 10,
+                    delay = 10,
+                    k     = 6,
                     flash = function () {
                         for (var i = 0; i < ys.length; i++) {
                             var y   = ys[i],
                                 row = self.cells[y];
                             if ((k % 2) === 0) {
                                 for (var x = 0; x < self.w; x++) {
-                                    if (k === 0) {
-                                        self.set(x, y, null);
-                                    } else {
-                                        row[x].div.style.backgroundColor = "white";
-                                    }
+                                    row[x].div.style.backgroundColor = "white";
                                 }
                             } else {
                                 for (var x = 0; x < self.w; x++) {
@@ -395,35 +413,6 @@
                         }
                     };
                 flash();
-            },
-            deleteRows: function (ys, then) {
-                log("deleteRows([" + ys.join(", ") + "])");
-                var self  = this,
-                    delay = 500,
-                    i     = 0,
-                    del   = function () {
-                        log("deleteRows.del({ i: " + i + ", y: " + (ys[i] - i) + "..." + (self.h - 1) + "})");
-                        if (i < ys.length) {
-                            for (var y = ys[i] - i + 1; y < self.h; y++) {
-                                for (var x = 0; x < self.w; x++) {
-                                    self.set(x, y - 1, self.cells[y][x].piece);
-                                }
-                            }
-                            for (x = 0; x < self.w; x++) {
-                                self.set(x, self.h - 1, null);
-                            }
-                            if (i === 0) {  // first completed row deleted
-                                self.inject(Piece.I[1]);    //Random();
-                            } else {
-                                self.currentY--;
-                            }
-                            window.setTimeout(del, delay);
-                            i++;
-                        } else {
-                            then();
-                        }
-                    };
-                self.flashRows(ys, del);
             },
         };
 
