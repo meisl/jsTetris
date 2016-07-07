@@ -156,15 +156,9 @@
             fDiv.style.height = (bW + h * (cH + bW)) + "px";
             fDiv.style.position = "absolute";
             fDiv.style.backgroundColor = "#333333"; //TODO: a bit darker than this.emptyColor
-
-            var self = this,
-                onload = window.onload;
-            window.onload = function () {
-                self.show();
-                if (onload) {
-                    onload();
-                }
-            };
+            
+            this.delay = 750;
+            this.currentPiece = null;
         }
         Field.prototype = {
             show: function (x, y) {
@@ -282,75 +276,50 @@
                 return this.inject(piece);
             },
             dropCurrent: function () {
-                log("dropCurrent({ dropping: " + this.dropping + "})");
-                if (this.dropping) {
-                    return;
-                }
-                var delay = 5,
-                    self = this,
-                    down = function () {
-                        return self.moveCurrent(0, -1);
-                    },
-                    onDrop = function () {
-                        log("dropCurrent.onDrop({ dropping: " + self.dropping + "})");
-                        if (self.currentPiece) {
-                            if (!down()) {
-                                self.stopDropping();
-                                window.setTimeout(function () {
-                                    self.startTicking();
-                                }, 750);
-                            } else {
-                                self.dropping = window.setTimeout(onDrop, delay);
-                            }
-                        } else {
-                            self.dropping = null;
-                            self.startTicking();
-                        }
-                    };
-                self.stopTicking();
-                // disable keys
-                onDrop();
-            },
-            stopDropping: function () {
-                if (this.dropping) {
-                    window.clearTimeout(this.dropping);
-                    this.dropping = null;
+                log("dropCurrent({ current: " + this.currentPiece + "})");
+                if (!this.dropping) {
+                    this.stopTicking();  // delete pending tick
+                    this.dropping = true;
+                    this.startTicking(); // reinstall next tick (will occur sooner)
                 }
             },
             startTicking: function () {
                 if (this.ticking) {
                     return;
                 }
-                var delay = 750,
+                var self = this,
                     gameOver = false,
-                    self = this,
                     down = function () {
                         return self.moveCurrent(0, -1);
                     },
                     onTick = function () {
-                        log("tick({ currentPiece: " + self.currentPiece + "})");
+                        log("tick({ currentPiece: " + self.currentPiece + ", dropping: " + self.dropping + " })");
                         if (self.currentPiece) {
                             if (down()) {
                                 
                             } else {
-                                var y    = self.currentY,
-                                    maxY = y + self.currentPiece.rows.length,
-                                    completed = [];
-                                while (y < maxY) {
-                                    if (self.isRowComplete(y)) {
-                                        completed.push(y);
+                                if (self.dropping) {
+                                    self.dropping = false;
+                                } else {
+                                    var y = self.currentY,
+                                        maxY = y + self.currentPiece.rows.length,
+                                        completed = [];
+                                    while (y < maxY) {
+                                        if (self.isRowComplete(y)) {
+                                            completed.push(y);
+                                        }
+                                        y++;
                                     }
-                                    y++;
+                                    self.currentPiece = null;
+                                    self.deleteRows(completed, onTick);
+                                    return;
                                 }
-                                self.currentPiece = null;
-                                self.deleteRows(completed, onTick);
-                                return;
                             }
                         } else { // no currentPiece
                             gameOver = !self.injectRandom();
                         }
                         if (!gameOver) {
-                            self.ticking = window.setTimeout(onTick, delay);
+                            self.ticking = window.setTimeout(onTick, self.dropping ? 5 : self.delay);
                         }
                     };
                 onTick();
@@ -399,17 +368,6 @@
                         }
                     };
                 flash();
-            },
-            deleteRow: function (y, then) {
-                var self = this;
-                self.flashRows([y], function () {
-                    for (var i = y + 1; i < self.h; i++) {
-                        for (var x = 0; x < self.w; x++) {
-                            self.set(x, i - 1, self.cells[i][x].piece);
-                        }
-                    }
-                    then();
-                });
             },
             deleteRows: function (ys, then) {
                 log("deleteRows([" + ys.join(", ") + "])");
@@ -484,6 +442,7 @@
                         mainField.stopTicking();
                         mainField.clear();
                         mainField.currentPiece = null;
+                        mainField.delay = 750;
                         mainField.startTicking();
                         return "ESC"; 
                     },
