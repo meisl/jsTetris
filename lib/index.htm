@@ -159,6 +159,7 @@
             
             this.delay = 750;
             this.currentPiece = null;
+            this.completed = [];
         }
         Field.prototype = {
             show: function (x, y) {
@@ -293,26 +294,46 @@
                         return self.moveCurrent(0, -1);
                     },
                     onTick = function () {
-                        log("tick({ currentPiece: " + self.currentPiece + ", dropping: " + self.dropping + " })");
-                        if (self.currentPiece) {
+                        var x, y, maxY, i;
+                        log("tick({ currentPiece: " + (self.currentPiece ? self.currentX + "/" + self.currentY : "-") + ", dropping: " + self.dropping + ", completed: [" + self.completed.join(", ") + "] })");
+                        if (self.completed.length) {
+                            y = self.completed.shift();
+                            while (y < self.h - 1) {
+                                for (x = 0; x < self.w; x++) {
+                                    self.set(x, y, self.cells[y + 1][x].piece);
+                                }
+                                y++;
+                            }
+                            // "shift in" an empty row at the top
+                            for (x = 0; x < self.w; x++) {
+                                self.set(x, self.h - 1, null);
+                            }
+                            for (i = 0; i < self.completed.length; i++) {
+                                self.completed[i]--;
+                            }
+                            if (!self.currentPiece) {
+                                self.inject(Piece.I[1]);    //Random();
+                            } else {
+                                self.currentY--;
+                            }
+                        } else if (self.currentPiece) {
                             if (down()) {
                                 
                             } else {
                                 if (self.dropping) {
                                     self.dropping = false;
                                 } else {
-                                    var y = self.currentY,
-                                        maxY = y + self.currentPiece.rows.length,
-                                        completed = [];
+                                    y = self.currentY,
+                                    maxY = y + self.currentPiece.rows.length;
                                     while (y < maxY) {
                                         if (self.isRowComplete(y)) {
-                                            completed.push(y);
+                                            self.completed.push(y);
                                         }
                                         y++;
                                     }
                                     self.currentPiece = null;
-                                    if (completed.length) {
-                                        self.deleteRows(completed, onTick);
+                                    if (self.completed.length) {
+                                        self.flashRows(self.completed, onTick);
                                         return;
                                     } else {
                                         gameOver = !self.injectRandom();
@@ -324,6 +345,8 @@
                         }
                         if (!gameOver) {
                             self.ticking = window.setTimeout(onTick, self.dropping ? 5 : self.delay);
+                        } else {
+                            log("Game over!");
                         }
                     };
                 onTick();
@@ -345,7 +368,7 @@
             flashRows: function (ys, then) {
                 log("flashRows([" + ys.join(", ") + "])");
                 var self  = this,
-                    delay = 50,
+                    delay = 20,
                     k     = 10,
                     flash = function () {
                         for (var i = 0; i < ys.length; i++) {
@@ -386,8 +409,11 @@
                                     self.set(x, y - 1, self.cells[y][x].piece);
                                 }
                             }
+                            for (x = 0; x < self.w; x++) {
+                                self.set(x, self.h - 1, null);
+                            }
                             if (i === 0) {  // first completed row deleted
-                                self.injectRandom();
+                                self.inject(Piece.I[1]);    //Random();
                             } else {
                                 self.currentY--;
                             }
@@ -444,7 +470,6 @@
              80:   function () { return "P"; },         // P
              19:   function () { return "PAUSE"; },     // PAUSE
              27:   function () {        // ESC
-                        mainField.stopDropping();
                         mainField.stopTicking();
                         mainField.clear();
                         mainField.currentPiece = null;
