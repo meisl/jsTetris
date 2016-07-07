@@ -334,17 +334,23 @@
                                 
                             } else {
                                 // TODO: check for completed rows
-                                var maxY = self.currentY + self.currentPiece.rows.length;
-                                for (var y = self.currentY; y < maxY; ) {
-                                    console.log("check " + y + ": maxY = " + maxY);
-                                    if (self.isRowComplete(y)) {
-                                        self.deleteRow(y);
-                                        maxY--;
-                                    } else {
-                                        y++;
-                                    }
-                                }
-                                gameOver = !self.injectRandom();
+                                var y    = self.currentY,
+                                    maxY = y + self.currentPiece.rows.length,
+                                    checkRows = function () {
+                                        while (y < maxY) {
+                                            if (self.isRowComplete(y)) {
+                                                maxY--;
+                                                self.deleteRow(y, checkRows);
+                                                return;
+                                            } else {
+                                                y++;
+                                            }
+                                        }
+                                        gameOver = !self.injectRandom();
+                                        self.ticking = window.setTimeout(onTick, delay);
+                                    };
+                                checkRows();
+                                return;
                             }
                         } else { // no currentPiece
                             gameOver = !self.injectRandom();
@@ -362,7 +368,6 @@
                 }
             },
             isRowComplete: function (y) {
-                console.log("isRowComplete(" + y + ")");
                 for (var x = 0; x < this.w; x++) {
                     if (this.isFree(x, y)) {
                         return false;
@@ -370,12 +375,36 @@
                 }
                 return true;
             },
-            deleteRow: function (y) {
-                for (var i = y + 1; i < this.h; i++) {
-                    for (var x = 0; x < this.w; x++) {
-                        this.set(x, i - 1, this.cells[i][x].piece);
+            flashRow: function (y, then) {
+                this.assertValid(0, y);
+                var self  = this,
+                    row   = self.cells[y],
+                    i     = 10,
+                    flash = function () {
+                        if ((i % 2) === 0) {
+                            for (var x = 0; x < self.w; x++) {
+                                
+                                row[x].div.style.backgroundColor = "white";
+                            }
+                        } else {
+                            for (var x = 0; x < self.w; x++) {
+                                self.set(x, y, row[x].piece);
+                            }
+                        }
+                        window.setTimeout(--i ? flash : then, 50);
+                    };
+                flash();
+            },
+            deleteRow: function (y, then) {
+                var self = this;
+                self.flashRow(y, function () {
+                    for (var i = y + 1; i < self.h; i++) {
+                        for (var x = 0; x < self.w; x++) {
+                            self.set(x, i - 1, self.cells[i][x].piece);
+                        }
                     }
-                }
+                    then();
+                });
             },
         };
 
