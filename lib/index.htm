@@ -311,8 +311,12 @@
                                         y++;
                                     }
                                     self.currentPiece = null;
-                                    self.deleteRows(completed, onTick);
-                                    return;
+                                    if (completed.length) {
+                                        self.deleteRows(completed, onTick);
+                                        return;
+                                    } else {
+                                        gameOver = !self.injectRandom();
+                                    }
                                 }
                             }
                         } else { // no currentPiece
@@ -371,9 +375,6 @@
             },
             deleteRows: function (ys, then) {
                 log("deleteRows([" + ys.join(", ") + "])");
-                if (ys.length === 0) {
-                    return then();
-                }
                 var self  = this,
                     delay = 500,
                     i     = 0,
@@ -384,6 +385,11 @@
                                 for (var x = 0; x < self.w; x++) {
                                     self.set(x, y - 1, self.cells[y][x].piece);
                                 }
+                            }
+                            if (i === 0) {  // first completed row deleted
+                                self.injectRandom();
+                            } else {
+                                self.currentY--;
                             }
                             window.setTimeout(del, delay);
                             i++;
