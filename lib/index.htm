@@ -124,6 +124,8 @@
                 cells = [];
             this.w = w;
             this.h = h;
+            this.cW = cW;
+            this.cH = cH;
             this.emptyColor   = "#222222";
             this.cells        = cells;
             this.div          = fDiv;
@@ -166,7 +168,7 @@
         }
         Field.prototype = {
             show: function (x, y) {
-                this.x = x || this.x || 100;
+                this.x = x || this.x || 200;
                 this.y = y || this.y ||  20;
                 this.div.style.left = this.x + "px";
                 this.div.style.top  = this.y + "px";
@@ -280,6 +282,7 @@
                 return this.inject(piece);
             },
             dropCurrent: function () {
+                log("dropCurrent({ dropping: " + this.dropping + "})");
                 if (this.dropping) {
                     return;
                 }
@@ -289,17 +292,13 @@
                         return self.moveCurrent(0, -1);
                     },
                     onDrop = function () {
+                        log("dropCurrent.onDrop({ dropping: " + self.dropping + "})");
                         if (self.currentPiece) {
                             if (!down()) {
-                                if (self.dropping) {
-                                    self.dropping = null;
-                                    window.setTimeout(function () {
-                                        self.startTicking();
-                                    }, 750);
-                                } else {
+                                self.stopDropping();
+                                window.setTimeout(function () {
                                     self.startTicking();
-                                }
-
+                                }, 750);
                             } else {
                                 self.dropping = window.setTimeout(onDrop, delay);
                             }
@@ -329,27 +328,22 @@
                         return self.moveCurrent(0, -1);
                     },
                     onTick = function () {
+                        log("tick({ currentPiece: " + self.currentPiece + "})");
                         if (self.currentPiece) {
                             if (down()) {
                                 
                             } else {
-                                // TODO: check for completed rows
                                 var y    = self.currentY,
                                     maxY = y + self.currentPiece.rows.length,
-                                    checkRows = function () {
-                                        while (y < maxY) {
-                                            if (self.isRowComplete(y)) {
-                                                maxY--;
-                                                self.deleteRow(y, checkRows);
-                                                return;
-                                            } else {
-                                                y++;
-                                            }
-                                        }
-                                        gameOver = !self.injectRandom();
-                                        self.ticking = window.setTimeout(onTick, delay);
-                                    };
-                                checkRows();
+                                    completed = [];
+                                while (y < maxY) {
+                                    if (self.isRowComplete(y)) {
+                                        completed.push(y);
+                                    }
+                                    y++;
+                                }
+                                self.currentPiece = null;
+                                self.deleteRows(completed, onTick);
                                 return;
                             }
                         } else { // no currentPiece
@@ -375,29 +369,40 @@
                 }
                 return true;
             },
-            flashRow: function (y, then) {
-                this.assertValid(0, y);
+            flashRows: function (ys, then) {
+                log("flashRows([" + ys.join(", ") + "])");
                 var self  = this,
-                    row   = self.cells[y],
-                    i     = 10,
+                    delay = 50,
+                    k     = 10,
                     flash = function () {
-                        if ((i % 2) === 0) {
-                            for (var x = 0; x < self.w; x++) {
-                                
-                                row[x].div.style.backgroundColor = "white";
-                            }
-                        } else {
-                            for (var x = 0; x < self.w; x++) {
-                                self.set(x, y, row[x].piece);
+                        for (var i = 0; i < ys.length; i++) {
+                            var y   = ys[i],
+                                row = self.cells[y];
+                            if ((k % 2) === 0) {
+                                for (var x = 0; x < self.w; x++) {
+                                    if (k === 0) {
+                                        self.set(x, y, null);
+                                    } else {
+                                        row[x].div.style.backgroundColor = "white";
+                                    }
+                                }
+                            } else {
+                                for (var x = 0; x < self.w; x++) {
+                                    self.set(x, y, row[x].piece);
+                                }
                             }
                         }
-                        window.setTimeout(--i ? flash : then, 50);
+                        if (k--) {
+                            window.setTimeout(flash, delay);
+                        } else {
+                            then();
+                        }
                     };
                 flash();
             },
             deleteRow: function (y, then) {
                 var self = this;
-                self.flashRow(y, function () {
+                self.flashRows([y], function () {
                     for (var i = y + 1; i < self.h; i++) {
                         for (var x = 0; x < self.w; x++) {
                             self.set(x, i - 1, self.cells[i][x].piece);
@@ -406,15 +411,40 @@
                     then();
                 });
             },
+            deleteRows: function (ys, then) {
+                log("deleteRows([" + ys.join(", ") + "])");
+                if (ys.length === 0) {
+                    return then();
+                }
+                var self  = this,
+                    delay = 500,
+                    i     = 0,
+                    del   = function () {
+                        log("deleteRows.del({ i: " + i + ", y: " + (ys[i] - i) + "..." + (self.h - 1) + "})");
+                        if (i < ys.length) {
+                            for (var y = ys[i] - i + 1; y < self.h; y++) {
+                                for (var x = 0; x < self.w; x++) {
+                                    self.set(x, y - 1, self.cells[y][x].piece);
+                                }
+                            }
+                            window.setTimeout(del, delay);
+                            i++;
+                        } else {
+                            then();
+                        }
+                    };
+                self.flashRows(ys, del);
+            },
         };
 
 
         var w = 10,
             h = 20;
         var mainField = new Field(w, h);
+            mainField.x = 400;
 
         var pcField = new Field(20, Piece.len * 5);
-        pcField.x = 450;
+        pcField.x = mainField.x + mainField.w * mainField.cW + 50;
         for (var i = 0; i < Piece.len; i++) {
             var p = Piece[i];
             for (var k = 0; k < p.length; k++) {
@@ -463,15 +493,30 @@
             var evt = evt || window.event,
                 nChr = evt.charCode || evt.keyCode,
                 what = "";
-                if (keys[nChr]) {
-                    what = keys[nChr]();
-                }
-                document.body.appendChild(document.createTextNode(nChr + ": " + what));
-                document.body.appendChild(document.createElement("br"));
-                return false;
+            if (keys[nChr]) {
+                what = keys[nChr]();
+            }
+            log(nChr + ": " + what);
+            return false;
+        };
+
+        function log(msg) {
+            document.body.appendChild(document.createTextNode(msg));
+            document.body.appendChild(document.createElement("br"));
         }
 
-        mainField.startTicking();
+        mainField.put(Piece.O[0], 0, 0);
+        mainField.put(Piece.O[0], 2, 0);
+        mainField.put(Piece.O[0], 4, 0);
+        mainField.put(Piece.T[2], 6, 0);
+        mainField.put(Piece.I[0], 0, 2);
+        mainField.put(Piece.I[0], 4, 2);
+
+        window.onload = function () {
+            mainField.show();
+            pcField.show();
+            mainField.startTicking();
+        };
 
 
     //-->
